@@ -1,49 +1,58 @@
-# Manual Enrollment
+# Future Patches
+- ⚠️ Linux Mint 21.2 users and later, this traditional way ain't gonna work out since its reported a breakage in 'shim' module. The immidiate next update rolled out a different procedure to fix this issue. This would sign all the modules automatically via one single command
 
+  ```sudo /bin/sh /sbin/update-secureboot-policy --enroll-key```
+  
+  *Courtesy: [Linux mint 21.2 Relelase](https://linuxmint.com/rel_victoria_cinnamon.php)*,  *[Linux mint Support Page](https://forums.linuxmint.com/viewtopic.php?t=397115)*
+
+
+# Manual Enrollment
 - First ensure the secure boot is turned on by executing. Turn on secure boot via UEFI firmware if not enabled 
 
-   `sudo mokutil --sb-state`
+   ```sudo mokutil --sb-state```
 
 - Make sure you got the binaries installed on your linux machine
 
-    `sudo apt install broadcom-wl`  
-    `sudo apt install bcmwl-kernel-source`  
-    `sudo apt install broadcom-sta-dkms`
+    ```sudo apt install broadcom-wl```   
+    ```sudo apt install bcmwl-kernel-source```  
+    ```sudo apt install broadcom-sta-dkms```
 - Make sure you have your kernel headers installed as well
 
-  `sudo apt install linux-headers-$(uname -r)`
+  ```sudo apt update && sudo apt upgrade```  
+  ```sudo apt install linux-headers-$(uname -r)```
 
 - Locate your kernel module in the /lib directory over root and move them over to Desktop or Documents
     
-    `sudo mv /lib/modules/$(uname -r)/updates/dkms/wl.ko.zst ~/Desktop && cd ~/Desktop`
+    ```sudo mv /lib/modules/$(uname -r)/updates/dkms/wl.ko.zst ~/Desktop```  
+    ```cd ~/Desktop```
 
 - The latest package in `broadcom-sta-dkms` typically ships with the .ko filed under zst compression but the `bcmwl-kernel-source` till date ships directly with the .ko file. Decompress the file and extract the wl.ko file
-    `zstd -d wl.ko.zst -o wl.ko`
+    ```zstd -d wl.ko.zst -o wl.ko```
 
 -  Generate an RSA private key and derive a public key more like a certificate (X.509)
 
-   `openssl req -new -x509 -newkey rsa:2048 -keyout key.priv -outform DER -out key.der -nodes -days 36500 -subj "/CN=broadcom-sta/"`
+   ```openssl req -new -x509 -newkey rsa:2048 -keyout key.priv -outform DER -out key.der -nodes -days 36500 -subj "/CN=broadcom-sta/"```
 
 - Register your public key generated with secure boot (Signature Database) and provide a strong passkey via MOKutility
 
-  `sudo mokutil --import key.der`
+  ```sudo mokutil --import key.der```
 
 - Sign your kernel module with both they keys using SHA256 key via Linux headers
 
-  `sudo /usr/src/linux-headers-$(uname -r)/scripts/sign-file sha256 key.priv key.der wl.ko`
+  ```sudo /usr/src/linux-headers-$(uname -r)/scripts/sign-file sha256 key.priv key.der wl.ko```
 
 
 - Compress the file back into .zhc
 
-    `zstd -c wl.ko > wl.ko.zst`
+    ```zstd -c wl.ko > wl.ko.zst```
 
 - Move the file back to the /lib directory
 
-    `sudo cp wl.ko.zst /lib/modules/$(uname -r)/updates/dkms`
+    ```sudo cp wl.ko.zst /lib/modules/$(uname -r)/updates/dkms```
 
 - Reboot and enter your password you've created and make sure the secure boot is turned on
 
-    `sudo systemctl reboot --firmware`
+    `sudo systemctl reboot`
 
 - You've made it 🎉. The driver must be up and functional as usual
 
@@ -110,4 +119,6 @@ You could clone the current project by
 ## Documentation
 
 [Documentation](https://github.com/clearlinux/clear-linux-documentation/blob/master/source/tutorials/broadcom.rst)
+
+
 
