@@ -1,47 +1,44 @@
 #!/bin/bash
 
-# Check if the script is run as root
-if [ "$EUID" -ne 0 ]; then
-    echo ""
-    echo "Detecting distribution"
-    if grep -q -i 'debian' /etc/os-release; then
-    echo "This is a Debian-based system."
-else
-    echo ""
-    echo "This is not a Debian-based system. This script only works for debian bases systems"
-    exit 1
-fi
-    echo ""
-    echo "Script requires elevated (sudo) privileges."
-    echo "Do you want to run this script in (sudo) mode (y/n)?"
-    read CHOICE
-    echo ""
-    if [[ "$CHOICE" == "y" || "$CHOICE" == "Y" ]]; then
-        sudo "$0" "$@"
-        exit 0
-    else
-        echo "Exiting script."
-        exit 1
-    fi
-fi
+USERNAME=$USER
 
+# Function to check if the script is run as root
+check_root() {
+    if [ "$EUID" -ne 0 ]; then
+        echo ""
+        echo "Detecting distribution..."
+        
+        # Check if the system is Debian-based
+        if grep -q -i 'debian' /etc/os-release; then
+            echo "This is a Debian-based system."
+        else
+            echo ""
+            echo "This is not a Debian-based system. This script only works for Debian-based systems."
+            exit 1
+        fi
+    fi
+}
+
+# Function to execute the main logic
 execute() {
-    echo ""	
+    echo ""
     echo "Detected: $OSTYPE"
     echo ""
     echo "Release: $(lsb_release -a)"
     echo ""
     echo "Kernel: $(uname -r)"
     echo ""
-    
-    #Hardcoded packages
-    NAME="broadcom-sta-dkms"
-    NAME2="bcmwl-kernel-source"
 
-    # Install mokutil if not installed
+    # Hardcoded package names
+    local NAME="broadcom-sta-dkms"
+    local NAME2="bcmwl-kernel-source"
+
+    # Install mokutil
+    echo "Installing mokutil"
+    echo ""
     sudo apt install -y mokutil
-    echo "Let's check your Secure Boot status..."
 
+    echo "Let's check your Secure Boot status..."
     if command -v mokutil &>/dev/null; then
         secure_boot_status=$(mokutil --sb-state)
         echo "$secure_boot_status"
@@ -52,68 +49,133 @@ execute() {
             echo "Secure Boot is disabled."
         fi
     else
-        echo "mokutil is not installed. Cannot check Secure Boot status."
+        echo "Mokutil is not installed. Cannot check Secure Boot status."
     fi
-    
-    # Check if Broadcom packages are installed
-    if dpkg -s $NAME &>/dev/null || dpkg -s $NAME2 &>/dev/null; then
-        echo "$NAME or $NAME2 packages are installed."
-    else
-        echo "$NAME nor $NAME2 are not installed."
-        echo "Do you want to install them (y/n)?"
-        read CHOICE
-        if [[ "$CHOICE" == "y" || "$CHOICE" == "Y" ]]; then
-            echo "Installing packages..."
-            sudo apt-get update
-            sudo ubuntu-drivers install
-            if [ $? -eq 0 ]; then
-                echo "Installation successful."
-            else
-                echo "Error installing packages."
-                exit 1
-            fi
-            sudo apt install linux-headers-$(uname -r) -y
 
-            # Process kernel module files
-            for file in /lib/modules/$(uname -r)/updates/dkms/*.zst; do
-                if [ -f "$file" ]; then
-                    echo "Found zst file: $file"
-                    sudo mv /lib/modules/$(uname -r)/updates/dkms/wl.ko.zst ~/Desktop
-                    cd ~/Desktop
-                    zstd -d wl.ko.zst -o wl.ko
+    # Install broadcom-sta-dkms
+    echo ""
+    echo -n "Should I install broadcom-sta-dkms? (y/n): "
+    read CHOICE
+
+    if [[ "$CHOICE" == "y" || "$CHOICE" == "Y" ]]; then
+        echo ""
+        echo "Performing full system upgrade..."
+        sleep 2
+        sudo apt-get update && sudo apt-get upgrade -y
+        echo ""
+        echo "System upgrade completed."
+        sleep 2
+	echo ""
+        echo "Installing dependencies..."
+        echo ""
+        sleep 2
+        sudo apt install -y broadcom-sta-dkms linux-headers-$(uname -r)
+
+        if [ $? -eq 0 ]; then
+            echo ""
+            echo "Installation successful."
+            sleep 2
+            # Move the module to Desktop
+            sudo cp /lib/modules/$(uname -r)/updates/dkms/wl.ko.zst /home/$USERNAME/Desktop
+            if [ $? -eq 0 ]; then
+            	echo ""
+                echo "Moved module to Desktop."
+                sleep 2
+
+                # Decompress the .zst archive
+                cd /home/$USERNAME/Desktop
+                zstd -d wl.ko.zst -o wl.ko
+                if [ $? -eq 0 ]; then
+                	echo ""
+                    echo "Decompressed ZST archive."
+                    sleep 2
+
+                    # Generate RSA keys for signing
                     echo ""
                     echo "Generating RSA keys..."
                     openssl req -new -x509 -newkey rsa:2048 -keyout key.priv -outform DER -out key.der -nodes -days 36500 -subj "/CN=broadcom-sta/"
-                    echo "Generated RSA Keys."
-                    echo ""
-                    echo "Enrolling key via MOK. Enter a strong password."
-                    sudo mokutil --import key.der
-                    echo "Signing kernel modules with the generated keys."
-                    sudo /usr/src/linux-headers-$(uname -r)/scripts/sign-file sha256 key.priv key.der wl.ko
-                    echo "Signed kernel modules with private and public keys."
-                    echo ""
-                    zstd -c wl.ko > wl.ko.zst
-                    sudo cp wl.ko.zst /lib/modules/$(uname -r)/updates/dkms
-                    echo "Process completed. Restart your system and enroll your module by entering the password."
-                    echo "-----------------------------------------------------------------------------------------"
-                    echo "Since MOK (Machine Owner Key) key is enrolled, KEEP THE KEY.priv SAFE if your concerned about security"
-                    echo ""
-                    sleep 3
-                    echo "Anybody can allow any kernel signed module with your .priv key and make sure you keep it safe"
-                    echo ""
-                    sleep 3
-                    echo "Deleting they can be an option but YOU CANNOT SIGN ANYMORE NEW MODULES which are installed (eg Vbox modules)"
-                    echo ""
-                    sleep 3
-                    echo "Loosing the key can result in enrollment of new key again"
-                    echo ""
-                    sleep 3
-                    echo "-----------------------------------------------------------------------------------------"
+                    if [ $? -eq 0 ]; then
+                    	echo ""
+                        echo "Generated RSA Keys."
+                        sleep 2
+
+                        # Enroll key via MOK
+                        echo ""
+                        echo "Enrolling key via MOK. Enter a strong password."
+                        sudo mokutil --import key.der
+                        if [ $? -eq 0 ]; then
+                        	echo ""
+                            echo "Module imported via Mokutil."
+                            sleep 2
+
+                            # Sign the kernel module with generated keys
+                            echo "Signing kernel modules with the generated keys."
+                            sudo /usr/src/linux-headers-$(uname -r)/scripts/sign-file sha256 key.priv key.der wl.ko
+                            if [ $? -eq 0 ]; then
+                            	echo ""
+                                echo "Signed kernel module successfully."
+                                sleep 2
+
+                                # Repack the archive
+                                echo ""
+                                echo "Repacking archive..."
+                                sudo sh -c "zstd -c wl.ko > wl.ko.zst"
+                                if [ $? -eq 0 ]; then
+                                    echo ""
+                                    echo "Archive repacked."
+                                    sleep 2
+
+                                    # Copy the archive back to the modules directory
+                                    echo "Copying the archive back to the modules directory..."
+                                    sudo rm /lib/modules/$(uname -r)/updates/dkms/wl.ko.zst
+                                    sudo cp wl.ko.zst /lib/modules/$(uname -r)/updates/dkms
+                                    sudo rm -rf /home/$USERNAME/Desktop/wl.ko.zst /home/$USERNAME/Desktop/wl.ko /home/$USERNAME/Desktop/key.der
+                                    if [ $? -eq 0 ]; then
+                                   	echo ""
+                                        echo "Copied the archive back to modules."
+                                        sleep 2
+
+                                        # Final instructions
+                                        echo ""
+                                        echo "Process completed. Restart your system and enroll your module by entering the password."
+                                        echo ""
+                                        echo "-------------------------------------------------"
+                                        echo "Since MOK (Machine Owner Key) is enrolled, KEEP the key.priv file SAFE if you are concerned about security."
+                                        echo ""
+                                        echo "Anyone with access to your .priv key can sign kernel modules, so protect it carefully!"
+                                        echo ""
+                                        echo "Losing the key will require enrolling a new key."
+                                        echo "-----------------------------------------------------------------------------------------"
+                                    else
+                                        echo "Error copying archive back to modules directory."
+                                    fi
+                                else
+                                    echo "Error repacking archive."
+                                fi
+                            else
+                                echo "Error signing kernel module."
+                            fi
+                        else
+                            echo "Error importing MOK key."
+                        fi
+                    else
+                        echo "Error generating RSA keys."
+                    fi
+                else
+                    echo "Error decompressing the ZST archive."
                 fi
-            done
+            else
+                echo "Error moving module to Desktop."
+            fi
+        else
+            echo "Error installing broadcom-sta-dkms or linux headers."
+            exit 1
         fi
     fi
+exit 1
 }
 
+# Main script execution
+check_root
 execute
 
