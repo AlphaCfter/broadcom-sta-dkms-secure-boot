@@ -5,7 +5,39 @@
   
   *Courtesy: [Linux mint 21.2 Relelase](https://linuxmint.com/rel_victoria_cinnamon.php)*,  *[Linux mint Support Page](https://forums.linuxmint.com/viewtopic.php?t=397115)*
 
+- ⚠️ Deepin OS is an immutable distribution where the access of the filesystem is at lockdown. So write is disabled as default within root files. Kernel `6.12.9-amd64-desktop-rolling` had to be removed due to direct dependency of `g++12`
+  
 
+  Disable immutability
+
+  `sudo deepin-immutable-ctl disable-system-protect enable`
+
+  Install broadcom-sta-dkms
+
+  `sudo apt install broadcom-sta-dkms -y`
+
+  When there are 2 copies of kernels in your operating system, `DKMS` compiles for both the kernels. Identify the ambiguity one and remove them
+  `6.12.9-amd64-desktop-rolling` in my case
+
+  `sudo apt remove linux-image-6.12.9-amd64-desktop-rolling`
+
+  Blacklist opensource drivers from the kernel
+
+  `sudo modprobe -r b43 ssb wl brcmfmac brcmsmac bcma`
+
+  Load the module on the running kernel
+
+  `sudo modprobe wl`
+
+    Lock the file system
+
+  `sudo deepin-immutable-ctl disable-system-protect disable`
+
+    *Courtesy: [Deepin Forums](https://bbs.deepin.org/en/post/237053)*,  *[Deepin Discussions](https://bbs.deepin.org/en/post/222134)*
+
+    ✅ Tested with *[Deepin 25 Preview](https://www.deepin.org/v25/en/)*
+
+    
 # Manual Enrollment
 - First ensure the secure boot is turned on by executing. Turn on secure boot via UEFI firmware if not enabled 
 
@@ -119,6 +151,8 @@ You could clone the current project by
 ## Documentation
 
 [Documentation](https://github.com/clearlinux/clear-linux-documentation/blob/master/source/tutorials/broadcom.rst)
+
+
 
 
 
