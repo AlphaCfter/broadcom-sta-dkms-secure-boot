@@ -45,10 +45,11 @@ execute() {
         # sudo apt-get --reinstall install bcmwl-kernel-source
         sudo modprobe -r b43 ssb wl brcmfmac brcmsmac bcma #Blacklist open-source drivers
         sudo modprobe wl #Load wl.ko module
+        sudo deepin-immutable-ctl disable-system-protect disable #Enable integrity protection
         echo ""
         echo "System Restart is recommended to take changes"
         sudo systemctl reboot
-        sudo deepin-immutable-ctl disable-system-protect disable #Disable integrity protection
+        
     fi
     
     if [[ "$DISTRO" == 'LinuxMint' ]]; then
