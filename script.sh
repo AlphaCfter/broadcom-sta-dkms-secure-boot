@@ -52,6 +52,32 @@ execute() {
         
     fi
     
+    if [[ "$DISTRO" == 'Fedora' ]]; then
+        echo ""
+        echo "Fedora detected"
+
+        # Add Fastest mirror via DNF conf
+        sudo sed -i '3i fastestmirror=True' /etc/dnf/dnf.conf
+
+        sudo dnf update && sudo dnf upgrade
+
+        
+        sudo dnf install kernel-devel kernel-headers #Headers
+        sudo dnf install https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm https://download1.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm #Grab a copy of the non free package
+        sudo mv /usr/lib/modules/$(uname -r)/extra/wl/wl.ko.xz ~/Desktop #Move to a writable path
+        cd ~/Desktop
+        tar wl.ko.xz	#Decompress the xz file
+        rm -rf wl.ko.xz #Remove the xz file to prevent from duplication
+        sudo /usr/src/kernels/$(uname -r)/scripts/sign-file sha256 key.priv key.der wl.ko
+        sudo sh -c "sudo xz wl.ko"
+        sudo mv wl.ko.xz /usr/lib/modules/$(uname -r)/extra/wl	#Move back to modules
+        sudo mokutil --import key.der #Import key
+        echo ""
+        echo "System Restart is recommended to take changes"
+        sudo systemctl reboot
+        
+    fi
+    
     if [[ "$DISTRO" == 'LinuxMint' ]]; then
         echo ""
         echo "Linux Mint detected"
