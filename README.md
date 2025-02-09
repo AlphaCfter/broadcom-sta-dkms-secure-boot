@@ -37,7 +37,58 @@
 
     ✅ Tested with *[Deepin 25 Preview](https://www.deepin.org/v25/en/)*
 
-    
+- ⚠️ Fedora Silverblue is an immutable distro works partially but not effectivly sign kernel modules due to strict write permissions
+
+- ⚠️ Fedora uses `akmod` to automatically compile modules with respective kernel updates. Akmods work similar to DKMS but not exactly same
+
+  Enable the rpmfusion repo to add non-free drivers
+
+  `sudo dnf install https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm https://download1.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm`
+
+  🎰 Use the fastest mirror available
+
+  `sudo sed -i '3i fastestmirror=True' /etc/dnf/dnf.conf`
+
+  Update system repositories
+  
+  `sudo dnf update && sudo dnf upgrade`
+
+  Install kernel headers
+
+  ` sudo dnf install kernel-devel kernel-headers`
+
+  Move the module to a writable location
+
+  `sudo mv /usr/lib/modules/$(uname -r)/extra/wl/wl.ko.xz ~/Desktop && cd ~/Desktop`
+
+  Decompress the xz file
+  
+  `tar wl.ko.xz	&& rm -rf wl.ko.xz`
+
+  Sign the module with SHA256
+
+  `sudo /usr/src/kernels/$(uname -r)/scripts/sign-file sha256 key.priv key.der wl.ko`
+
+  Compress the .ko file
+  
+  `sudo sh -c "sudo xz wl.ko"`
+        
+  Move the compressed file back to original location
+        
+  `sudo mv wl.ko.xz /usr/lib/modules/$(uname -r)/extra/wl`
+  
+  Enroll key via mokutil
+
+  `sudo mokutil --import key.der`
+
+  Restart Fedora
+
+  `sudo systemctl reboot`
+
+  ✅ Tested with [Fedora Workstation 41](https://fedoraproject.org/workstation/download)
+   
+  *Courtesy: [Cyberciti](https://www.cyberciti.biz/faq/fedora-linux-install-broadcom-wl-sta-wireless-driver-for-bcm43228/)*
+
 # Manual Enrollment
 - First ensure the secure boot is turned on by executing. Turn on secure boot via UEFI firmware if not enabled 
 
@@ -151,6 +202,7 @@ You could clone the current project by
 ## Documentation
 
 [Documentation](https://github.com/clearlinux/clear-linux-documentation/blob/master/source/tutorials/broadcom.rst)
+
 
 
 
